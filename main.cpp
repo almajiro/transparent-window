@@ -170,13 +170,13 @@ int main()
 		printf("Alpha (MAX: 255): ");
 		scanf_s("%d", &alpha);
 
-		if (255 < id || id <= 0) {
+		if (255 < alpha || alpha <= 0) {
 			do {
 				puts("It exceeds the range. Or the value is too small.");
 				Sleep(1000);
 				printf("Alpha (MAX: 255): ");
 				scanf_s("%d", &alpha);
-			} while (structCounter < id || id <= 0);
+			} while (255 < alpha || alpha <= 0);
 		}
 
 		transparentWindow(id-1, alpha);
