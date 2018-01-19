@@ -25,29 +25,21 @@ HWND gethWndfromWindows(int TargetID);
 
 BOOL transparentWindow(int id, int alpha)
 {
-	COLORREF r;
+	COLORREF r = RGB(255, 255, 255);
 
 	HWND hWnd = gethWndfromWindows(id);
 
 	if (hWnd == NULL) {
+		puts("");
 		for (int i = 0; i < 5; i++) puts("FAILED!!!");
 		Sleep(3000);
 		return false;
 	}
 
-	printf("Window Handler: %p\n", &hWnd);
-
-	//HWND hWnd = (struct HWND__*)0x000801BE;
 	long i = GetWindowLong(hWnd, GWL_EXSTYLE);
 
 	SetWindowLong(hWnd, GWL_EXSTYLE, i | WS_EX_LAYERED);
-	r = RGB(255, 255, 255);
-
 	SetLayeredWindowAttributes(hWnd, r, alpha, LWA_ALPHA);
-
-	printf("Set window alpha to %d\n", alpha);
-	Sleep(2000);
-
 	return true;
 }
 
@@ -57,7 +49,7 @@ BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass)
 		if (IsWindowOwner(hWnd)) {
 			if (lpTitle[0] != TEXT('\0')) {
 				if (lstrcmp(lpClass, TEXT("Progman")) != 0) {
-					_tprintf(TEXT("No.%02d\n"), structCounter+1);
+					_tprintf(TEXT("| NO.%02d | "), structCounter+1);
 					return TRUE;
 				}
 			}
@@ -71,36 +63,47 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 	TCHAR   szTitle[1024];
 	TCHAR   szClass[1024];
 
-	//INT*    lpCount = (INT *)lParam;
-	//*lpCount += 1;                                      // カウントの加算
-
-	GetWindowText(hWnd, szTitle, sizeof(szTitle));	// キャプションの取得
-	GetClassName(hWnd, szClass, sizeof(szClass));	// クラス文字列の取得
+	GetWindowText(hWnd, szTitle, sizeof(szTitle));
+	GetClassName(hWnd, szClass, sizeof(szClass));
 
 	if (IsEnumCheck(hWnd, szTitle, szClass)) {
 		DWORD ProcessID;
 		GetWindowThreadProcessId(hWnd, &ProcessID);
-		/*
-		_tprintf(TEXT("%4d: %c %c %c %c %c %c %c [%-50s] [%s]\n"),
-			*lpCount,								// 列挙番号
-			IsWindowOwner(hWnd) ? 'O' : '_',		// Ownerウインドウ
-			IsWindowUnicode(hWnd) ? 'U' : '_',		// Unicodeタイプ
-			IsWindowVisible(hWnd) ? 'V' : '_',		// 可視状態
-			IsWindowEnabled(hWnd) ? 'E' : '_',		// 有効状態
-			IsIconic(hWnd) ? 'I' : '_',				// 最小化状態
-			IsZoomed(hWnd) ? 'Z' : '_',				// 最大化状態
-			IsWindow(hWnd) ? 'W' : '_',				// ウインドウ有無
-			szClass,								// クラス文字列
-			szTitle);								// キャプション
-		*/
 
 		windows[structCounter].pid = ProcessID;
 		strcpy_s(windows[structCounter].title, szTitle);
 		structCounter++;
 
-		puts("------------------------------------------------");
-		_tprintf(TEXT("TASK:\t%s\nPID:\t%d\n"), szTitle, ProcessID);
-		puts("------------------------------------------------");
+		TCHAR *pt = szTitle;
+		int i = 0;
+
+		while (*pt != 0) {
+			if (_mbclen((BYTE*)pt) == 1) {
+				printf("%c", *pt);
+			}
+			else { // which mean is 2 bytes character
+				putchar(*pt);
+			}
+
+			if (i == 66) {
+				printf(" |\n");
+				printf("|       | ");
+				i = 0;
+			}
+			else {
+				i++;
+			}
+
+			pt++;
+		}
+
+		if (i <= 66) {
+			for (int j = 0; j < 68 - i; j++) {
+				printf(" ");
+			}
+			puts("|");
+		}
+		puts("+-------+---------------------------------------------------------------------+");
 	}
 	return TRUE;
 }
@@ -119,7 +122,6 @@ HWND gethWndfromWindows(int id)
 		GetWindowText(hWnd, szTitle, sizeof(szTitle));
 
 		if (windows[id].pid == ProcessID && !lstrcmp(windows[id].title, szTitle)) {
-			printf("Window handler found! PID: %d\n", ProcessID);
 			return hWnd;
 		}
 	} while ((hWnd = GetNextWindow(hWnd, GW_HWNDNEXT)) != NULL);
@@ -129,14 +131,15 @@ HWND gethWndfromWindows(int id)
 
 int main()
 {
-	int id;
-	int alpha;
+	int id, alpha, input;
 	int nCount = 0;
+	int i;
 
 	char ch;
 
 	while (1)
 	{
+		// List applications
 		do {
 			structCounter = 0;
 			for (int i = 0; i < 100; i++) {
@@ -145,42 +148,107 @@ int main()
 			}
 
 			system("cls");
-			puts("Window Transparent Tool by almajiro");
-			puts("----------------------------------------------");
+			puts("+------------------+");
+			puts("| APPLICATION LIST |");
+			puts("+-------+----------+----------------------------------------------------------+");
 
 			EnumWindows(EnumWindowsProc, (LPARAM)&nCount);
-			printf("r=Refresh, s=Set, other=Exit: ");
+			printf("r:REFRESH, s:SET, other:EXIT: ");
 		} while ((ch = _getche()) == 'r');
 
 		if (ch == 'x' || ch != 's') break;
 
 		puts("");
-		printf("Enter the application id: ");
+		printf("ENTER THE APPLICATION ID: ");
 		scanf_s("%d", &id);
 
 		if (structCounter < id || id <= 0) {
 			do {
-				puts("Please enter the correct application id.");
+				puts("PLEASE ENTER THE CORRECT APPLICATION ID.");
 				Sleep(1000);
-				printf("Enter the application id: ");
+				printf("ENTER THE APPLICATION ID: ");
 				scanf_s("%d", &id);
 			} while (structCounter < id || id <= 0);
 		}
 
-		printf("Alpha (MAX: 255): ");
-		scanf_s("%d", &alpha);
-
-		if (255 < alpha || alpha <= 0) {
-			do {
-				puts("It exceeds the range. Or the value is too small.");
-				Sleep(1000);
-				printf("Alpha (MAX: 255): ");
-				scanf_s("%d", &alpha);
-			} while (255 < alpha || alpha <= 0);
-		}
-
-		transparentWindow(id-1, alpha);
+		id--;
 		system("cls");
+
+		puts("SELECTED APPLICATION:");
+		puts("-------------------------------------------------------------------------------");
+		_tprintf("PROCESS NAME: %s\n", windows[id].title);
+		_tprintf("\t PID: %d\n", windows[id].pid);
+		puts("-------------------------------------------------------------------------------");
+
+		puts("PRESS t TO CHANGE TRANSPARENCY USING ARROW KEY");
+		puts("PRESS c TO ENTER THE VALUE");
+		puts("PRESS x TO BACK APPLICATION LIST");
+		puts("-------------------------------------------------------------------------------");
+		printf("YOUR CHOICE: ");
+		ch = _getche();
+
+		if(ch == 'c') {
+			printf("\rTRANSPARENCY[%%]: ");
+			scanf_s("%d", &input);
+
+			if (100 < input || input <= 0) {
+				do {
+					puts("IT EXCEEDS THE RANGE. OR THE VALUE IS TOO SMALL.");
+					Sleep(1000);
+					printf("TRANSPARENCY[%%]: ");
+					scanf_s("%d", &input);
+				} while (100 < input || input <= 0);
+			}
+
+			alpha = ((float)input / 100) * (float)255;
+
+			if (transparentWindow(id, alpha)){
+				printf("WINDOW TRANSPARENCY SET TO %d%%\n", input);
+				Sleep(3000);
+			}
+			else {
+				puts("FAIL TO SET TRANSPARENCY");
+			}
+		}
+		else if (ch == 't') {
+			alpha = 255;
+			transparentWindow(id, alpha);
+			while (1) {
+				ch = 0;
+
+				printf("\rTRANSPARENCY:\t");
+				printf("|");
+				for (i = 0; i < alpha / 5; i++) {
+					if ((alpha / 5 - 1) == i) {
+						printf(">");
+					}
+					else {
+						printf("-");
+					}
+				}
+				for (; i < 51; i++) {
+					printf(" ");
+				}
+
+				printf("|");
+
+				printf("  [");
+				printf("%003.f%%", ((float)alpha / (float)255 * 100) );
+				printf("] ");
+
+				ch = _getch();
+				if (ch == 0x48 || ch == 0x4d) {
+					if (alpha < 255) alpha += 5;
+					if (!transparentWindow(id, alpha)) break;
+				}
+				if (ch == 0x50 || ch == 0x4b) {
+					if (alpha > 5) alpha -= 5;
+					if(!transparentWindow(id, alpha)) break;
+				}
+
+				if (ch == 'x') break;
+			}
+		}
 	}
 
     return 0;
