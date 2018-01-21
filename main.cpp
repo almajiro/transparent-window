@@ -30,9 +30,6 @@ BOOL transparentWindow(int id, int alpha)
 	HWND hWnd = gethWndfromWindows(id);
 
 	if (hWnd == NULL) {
-		puts("");
-		for (int i = 0; i < 5; i++) puts("FAILED!!!");
-		Sleep(3000);
 		return false;
 	}
 
@@ -49,7 +46,6 @@ BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass)
 		if (IsWindowOwner(hWnd)) {
 			if (lpTitle[0] != TEXT('\0')) {
 				if (lstrcmp(lpClass, TEXT("Progman")) != 0) {
-					_tprintf(TEXT("| NO.%02d | "), structCounter+1);
 					return TRUE;
 				}
 			}
@@ -76,6 +72,8 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 
 		TCHAR *pt = szTitle;
 		int i = 0;
+
+		_tprintf(TEXT("| ID.%02d | "), structCounter);
 
 		while (*pt != 0) {
 			if (_mbclen((BYTE*)pt) == 1) {
@@ -148,25 +146,25 @@ int main()
 			}
 
 			system("cls");
-			puts("+------------------+");
-			puts("| APPLICATION LIST |");
-			puts("+-------+----------+----------------------------------------------------------+");
+			puts("+----------------------+                             +------------------------+");
+			puts("| アプリケーション一覧 |                             | ウィンドウ透明化ツール |");
+			puts("+-------+--------------+-----------------------------+------------------------+");
 
 			EnumWindows(EnumWindowsProc, (LPARAM)&nCount);
-			printf("r:REFRESH, s:SET, other:EXIT: ");
-		} while ((ch = _getche()) == 'r');
+			printf("r:リスト更新, s:設定, other:終了> ");
+		} while ((ch = _getch()) == 'r');
 
 		if (ch == 'x' || ch != 's') break;
 
 		puts("");
-		printf("ENTER THE APPLICATION ID: ");
+		printf("アプリケーションIDを入力> ");
 		scanf_s("%d", &id);
 
 		if (structCounter < id || id <= 0) {
 			do {
-				puts("PLEASE ENTER THE CORRECT APPLICATION ID.");
+				puts("正しいアプリケーションIDを入力してください。");
 				Sleep(1000);
-				printf("ENTER THE APPLICATION ID: ");
+				printf("アプリケーションIDを入力> ");
 				scanf_s("%d", &id);
 			} while (structCounter < id || id <= 0);
 		}
@@ -174,28 +172,60 @@ int main()
 		id--;
 		system("cls");
 
-		puts("SELECTED APPLICATION:");
-		puts("-------------------------------------------------------------------------------");
-		_tprintf("PROCESS NAME: %s\n", windows[id].title);
-		_tprintf("\t PID: %d\n", windows[id].pid);
-		puts("-------------------------------------------------------------------------------");
+		puts("+----------------------------+                       +------------------------+");
+		puts("| 選択されたアプリケーション |                       | ウィンドウ透明化ツール |");
+		puts("+----------+-----------------+-----------------------+------------------------+");
+		_tprintf("| タスク名 | ");
 
-		puts("PRESS t TO CHANGE TRANSPARENCY USING ARROW KEY");
-		puts("PRESS c TO ENTER THE VALUE");
-		puts("PRESS x TO BACK APPLICATION LIST");
+		TCHAR *pt = windows[id].title;
+		int i = 0;
+
+		while (*pt != 0) {
+			if (_mbclen((BYTE*)pt) == 1) {
+				printf("%c", *pt);
+			}
+			else { // which mean is 2 bytes character
+				putchar(*pt);
+			}
+
+			if (i == 63) {
+				printf(" |\n");
+				printf("|          | ");
+				i = 0;
+			}
+			else {
+				i++;
+			}
+
+			pt++;
+		}
+
+		if (i <= 63) {
+			for (int j = 0; j < 65 - i; j++) {
+				printf(" ");
+			}
+			puts("|");
+		}
+
+		_tprintf("|   PID    | %d                                                             |\n", windows[id].pid);
+		puts("+----------+------------------------------------------------------------------+");
+
+		puts(" T > 透明度を矢印キーで設定");
+		puts(" C > 透明度を数値で入力");
+		puts(" X > アプリケーション一覧へ戻る");
 		puts("-------------------------------------------------------------------------------");
-		printf("YOUR CHOICE: ");
+		printf("選択> ");
 		ch = _getche();
 
 		if(ch == 'c') {
-			printf("\rTRANSPARENCY[%%]: ");
+			printf("\r透明度[%%]> ");
 			scanf_s("%d", &input);
 
 			if (100 < input || input <= 0) {
 				do {
 					puts("IT EXCEEDS THE RANGE. OR THE VALUE IS TOO SMALL.");
 					Sleep(1000);
-					printf("TRANSPARENCY[%%]: ");
+					printf("\r透明度[%%]> ");
 					scanf_s("%d", &input);
 				} while (100 < input || input <= 0);
 			}
@@ -203,11 +233,13 @@ int main()
 			alpha = ((float)input / 100) * (float)255;
 
 			if (transparentWindow(id, alpha)){
-				printf("WINDOW TRANSPARENCY SET TO %d%%\n", input);
+				printf(">> ウィンドウの透明度を%d%%へ変更しました。\n", input);
 				Sleep(3000);
 			}
 			else {
-				puts("FAIL TO SET TRANSPARENCY");
+				puts(">> 透明度の設定に失敗しました。");
+				Sleep(3000);
+
 			}
 		}
 		else if (ch == 't') {
@@ -216,7 +248,7 @@ int main()
 			while (1) {
 				ch = 0;
 
-				printf("\rTRANSPARENCY:\t");
+				printf("\r\t透明度:\t");
 				printf("|");
 				for (i = 0; i < alpha / 5; i++) {
 					if ((alpha / 5 - 1) == i) {
@@ -238,15 +270,21 @@ int main()
 
 				ch = _getch();
 				if (ch == 0x48 || ch == 0x4d) {
-					if (alpha < 255) alpha += 5;
-					if (!transparentWindow(id, alpha)) break;
+					if (alpha < 255) {
+						alpha += 5;
+						if (!transparentWindow(id, alpha)) break;
+					}
 				}
 				if (ch == 0x50 || ch == 0x4b) {
-					if (alpha > 5) alpha -= 5;
-					if(!transparentWindow(id, alpha)) break;
+					if (alpha > 5) {
+						alpha -= 5;
+						if (!transparentWindow(id, alpha)) break;
+					}
 				}
 
 				if (ch == 'x') break;
+
+				Sleep(1);
 			}
 		}
 	}
