@@ -72,7 +72,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 		TCHAR *pt = szTitle;
 		int i = 0;
 
-		_tprintf(TEXT("| ID.%02d | "), structCounter);
+		_tprintf(TEXT("| No.%02d | "), structCounter);
 
 		while (*pt != 0) {
 			if (_mbclen((BYTE*)pt) == 1) {
@@ -157,7 +157,7 @@ int main()
 			puts("+----------------------------------+                 +------------------------+");
 			puts("| 現在起動しているアプリケーション |                 | ウィンドウ透明化ツール |");
 			puts("+-------+--------------+-----------------------------+------------------------+");
-			puts("| ID一覧|                     アプリケーション名                              |");
+			puts("| No一覧|                     アプリケーション名                              |");
 			puts("+-------+--------------+-----------------------------+------------------------+");
 
 			EnumWindows(EnumWindowsProc, (LPARAM)&nCount);
@@ -172,7 +172,7 @@ int main()
 
 		if(ch == 'S'){
 			puts("");
-			printf("ID番号を入力> ");
+			printf("Noを入力> ");
 			scanf_s("%d", &id);
 
 			if (structCounter < id || id <= 0) {
@@ -180,7 +180,7 @@ int main()
 					fflush(stdin);
 					puts("正しいアプリケーションIDを入力してください。");
 					Sleep(1000);
-					printf("ID番号を入力> ");
+					printf("Noを入力> ");
 					scanf_s("%d", &id);
 				} while (structCounter < id || id <= 0);
 			}
