@@ -1,41 +1,71 @@
-#include <tchar.h>
+/**
+ * @file transparent_testing.cpp
+ * @brief application window transparent tool.
+ * @author almajiro
+ * @date 2018/01/18
+ */
+
+// include headers
+#include "stdafx.h"
 #include <stdio.h>
-#include <stdlib.h>
+#include <tchar.h>
 #include <windows.h>
 #include <winuser.h>
 #include <psapi.h>
 #include <string.h>
 #include <conio.h>
 
-// オーナー・ウインドウの判別
+// owner window?
 #define IsWindowOwner(h) (GetWindow(h,GW_OWNER) == NULL)
 
+//! running applications data
 struct {
 	TCHAR title[1024];
 	DWORD pid;
 }windows[100];
 
-int structCounter = 0;
+//! running applications counter
+int windowCounter = 0;
 
+// functions
 BOOL transparentWindow(int id, int alpha);
 BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass);
 BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam);
 HWND gethWndfromWindows(int TargetID);
+void setDefault();
+void dispSelectedHeader(int id);
+char getChoice();
+BOOL changeTransparentUsingArrowKey(int id);
+void selected(int id);
+char listApplications();
+int inputNumber();
 
+/**
+ * @brief transparent the application window.
+ * @param id integer application id.
+ * @param alpha integer window transparency
+ * @return window handler HWND
+ */
 BOOL transparentWindow(int id, int alpha)
 {
+	//! rgb color
 	COLORREF r = RGB(255, 255, 255);
 
+	//! window handler
 	HWND hWnd = gethWndfromWindows(id);
 
-	if (hWnd == NULL) {
-		return false;
-	}
+	// if failed to get window handler.
+	if (hWnd == NULL) return false;
 
+	//! get window data with extended window style mode.
 	long i = GetWindowLong(hWnd, GWL_EXSTYLE);
 
+	// changes an attribute of the specified window.
 	SetWindowLong(hWnd, GWL_EXSTYLE, i | WS_EX_LAYERED);
+
+	// sets the opacity and transparency color key of a layered window.
 	SetLayeredWindowAttributes(hWnd, r, alpha, LWA_ALPHA);
+
 	return true;
 }
 
@@ -55,8 +85,9 @@ BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass)
 
 BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 {
-	TCHAR   szTitle[1024];
-	TCHAR   szClass[1024];
+	
+	TCHAR szTitle[1024];
+	TCHAR szClass[1024];
 
 	GetWindowText(hWnd, szTitle, sizeof(szTitle));
 	GetClassName(hWnd, szClass, sizeof(szClass));
@@ -65,26 +96,26 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 		DWORD ProcessID;
 		GetWindowThreadProcessId(hWnd, &ProcessID);
 
-		windows[structCounter].pid = ProcessID;
-		strcpy_s(windows[structCounter].title, szTitle);
-		structCounter++;
+		windows[windowCounter].pid = ProcessID;
+		strcpy_s(windows[windowCounter].title, szTitle);
+		windowCounter++;
 
 		TCHAR *pt = szTitle;
 		int i = 0;
 
-		_tprintf(TEXT("| No.%02d | "), structCounter);
+		_tprintf(TEXT("| No.%03d | "), windowCounter);
 
 		while (*pt != 0) {
 			if (_mbclen((BYTE*)pt) == 1) {
 				printf("%c", *pt);
 			}
-			else { // which mean is 2 bytes character
+			else {
 				putchar(*pt);
 			}
 
-			if (i == 66) {
+			if (i == 65) {
 				printf(" |\n");
-				printf("|       | ");
+				printf("|        | ");
 				i = 0;
 			}
 			else {
@@ -94,25 +125,33 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 			pt++;
 		}
 
-		if (i <= 66) {
-			for (int j = 0; j < 68 - i; j++) {
+		if (i <= 65) {
+			for (int j = 0; j < 67 - i; j++) {
 				printf(" ");
 			}
 			puts("|");
 		}
-		puts("+-------+---------------------------------------------------------------------+");
+		puts("+--------+--------------------------------------------------------------------+");
 	}
 	return TRUE;
 }
 
+/**
+ * @brief get window handler
+ * @param id integer application id.
+ * @return window handler HWND
+ */
 HWND gethWndfromWindows(int id)
 {
+	//! get top window handler
 	HWND hWnd = GetTopWindow(NULL);
 
 	do {
 		if (GetWindowLong(hWnd, GWL_HWNDPARENT) != 0 || !IsWindowVisible(hWnd)) continue;
 
 		DWORD ProcessID;
+
+		//! title buffer
 		TCHAR szTitle[1024];
 
 		GetWindowThreadProcessId(hWnd, &ProcessID);
@@ -126,192 +165,349 @@ HWND gethWndfromWindows(int id)
 	return NULL;
 }
 
+/**
+ * @brief set all windows to 100%.
+ */
 void setDefault()
 {
-	for(int i=0;i<structCounter; i++){
+	for (int i = 0; i<windowCounter; i++) {
 		transparentWindow(i, 255);
 	}
-	puts("\nすべてのアプリケーションの透明度を元に戻しました。");
-	Sleep(3000);
+	puts("\n >>>すべてのアプリケーションの透明度を元に戻しました。");
+
+	// wait for 2 seconds.
+	Sleep(2000);
 }
 
-int main()
+/**
+ * @brief display the properties page header
+ * @param id integer application id.
+ */
+void dispSelectedHeader(int id)
 {
-	int id, alpha, input;
-	int nCount = 0;
-	int i;
+	system("cls");
 
+	puts("+----------------------------+                       +------------------------+");
+	puts("| 選択されたアプリケーション |                       | ウィンドウ透明化ツール |");
+	puts("+----------+-----------------+-----------------------+------------------------+");
+	_tprintf("| タスク名 | ");
+
+	TCHAR *pt = windows[id].title;
+	int i = 0;
+
+	while (*pt != 0) {
+		if (_mbclen((BYTE*)pt) == 1) {
+			printf("%c", *pt);
+		}
+		else { // which mean is 2 bytes character
+			putchar(*pt);
+		}
+
+		if (i == 63) {
+			printf(" |\n");
+			printf("|          | ");
+			i = 0;
+		}
+		else {
+			i++;
+		}
+
+		pt++;
+	}
+
+	if (i <= 63) {
+		for (int j = 0; j < 65 - i; j++) {
+			printf(" ");
+		}
+		puts("|");
+	}
+
+	_tprintf("|   PID    | %d                                                             |\n", windows[id].pid);
+	puts("+----------+------------------------------------------------------------------+");
+
+	puts("   T > 透明度を矢印キーで設定 (←↑↓→)");
+	puts("   C > 透明度を数値で入力 (0-100)");
+	puts(" ESC > 戻る");
+	puts("-------------------------------------------------------------------------------");
+}
+
+/**
+ * @brief get one character.
+ * @return character code.
+ */
+char getChoice()
+{
 	char ch;
+	ch = toupper(_getche());
+	_putch('\n');
+	return ch;
+}
+
+/**
+ * @brief change transparent using arrow key.
+ * @param id integer application id.
+ * @return hwnd error status in boolean.
+ */
+BOOL changeTransparentUsingArrowKey(int id)
+{
+	//! character buffer
+	char ch;
+
+	//! counter
+	int i;
+	
+	//! window alpha
+	int alpha = 255;
+
+	transparentWindow(id, alpha);
+	_putch('\n');
+	puts(" >>> ESCで戻る");
+
+	while (1) {
+		ch = 0;
+
+		printf("\r\t透明度:\t");
+		printf("|");
+		for (i = 0; i < alpha / 5; i++) {
+			if ((alpha / 5 - 1) == i) {
+				printf(">");
+			}
+			else {
+				printf("-");
+			}
+		}
+		for (; i < 51; i++) {
+			printf(" ");
+		}
+
+		printf("|");
+
+		printf("  [");
+		printf("%003.f%%", ((float)alpha / (float)255 * 100));
+		printf("] ");
+
+		ch = _getch();
+		if (ch == 0x48 || ch == 0x4d) {
+			if (alpha < 255) {
+				alpha += 5;
+				if (!transparentWindow(id, alpha)) return false;
+			}
+		}
+		if (ch == 0x50 || ch == 0x4b) {
+			if (alpha > 5) {
+				alpha -= 5;
+				if (!transparentWindow(id, alpha)) return false;
+			}
+		}
+
+		if (ch == 0x1B) break;
+		Sleep(1);
+	}
+
+	// successful to exit property
+	return true;
+}
+
+/**
+ * @brief show properties.
+ * @param id integer application id.
+ */
+void selected(int id)
+{
+	//! alpha temp
+	int input, alpha;
+
+	//! choice temp
+	char choice;
+
+	//! hwnd error flag
+	bool hwnd_flag = false;
+
+	//! menu sleep flag
+	bool menu_flag = true;
 
 	while (1)
 	{
-		// List applications
-		do {
-			structCounter = 0;
-			for (int i = 0; i < 100; i++) {
-				windows[i].pid = NULL;
-				strcpy_s(windows[i].title, TEXT(""));
-			}
+		menu_flag = true;
 
-			system("cls");
-			puts("+----------------------------------+                 +------------------------+");
-			puts("| 現在起動しているアプリケーション |                 | ウィンドウ透明化ツール |");
-			puts("+-------+--------------+-----------------------------+------------------------+");
-			puts("| No一覧|                     アプリケーション名                              |");
-			puts("+-------+--------------+-----------------------------+------------------------+");
+		dispSelectedHeader(id);
 
-			EnumWindows(EnumWindowsProc, (LPARAM)&nCount);
-			printf("r:リスト更新, s:設定, x:すべて元に戻す, other:終了> ");
-		} while ((ch = toupper(_getch())) == 'R');
+		printf(" 選択> ");
+		choice = getChoice();
 
-		if(ch == 'X'){
-			setDefault();
-		}
+		switch (choice) {
+			case 'C':	// change transparent by value
+				while (1) {
+					printf(" 透明度[%%] (ESCで戻る)> ");
+					input = inputNumber();
 
-		if (ch != 'X' && ch != 'S') break;
-
-		if(ch == 'S'){
-			puts("");
-			printf("Noを入力> ");
-			scanf_s("%d", &id);
-
-			if (structCounter < id || id <= 0) {
-				do {
-					fflush(stdin);
-					puts("正しいアプリケーションIDを入力してください。");
-					Sleep(1000);
-					printf("Noを入力> ");
-					scanf_s("%d", &id);
-				} while (structCounter < id || id <= 0);
-			}
-
-			id--;
-			system("cls");
-
-			puts("+----------------------------+                       +------------------------+");
-			puts("| 選択されたアプリケーション |                       | ウィンドウ透明化ツール |");
-			puts("+----------+-----------------+-----------------------+------------------------+");
-			_tprintf("| タスク名 | ");
-
-			TCHAR *pt = windows[id].title;
-			int i = 0;
-
-			while (*pt != 0) {
-				if (_mbclen((BYTE*)pt) == 1) {
-					printf("%c", *pt);
-				}
-				else { // which mean is 2 bytes character
-					putchar(*pt);
+					if (input == -1 || (input >= 0 && input <= 100 )) break;
+					puts(" >>> 正しい数値を入力してください。");
 				}
 
-				if (i == 63) {
-					printf(" |\n");
-					printf("|          | ");
-					i = 0;
-				}
-				else {
-					i++;
-				}
-
-				pt++;
-			}
-
-			if (i <= 63) {
-				for (int j = 0; j < 65 - i; j++) {
-					printf(" ");
-				}
-				puts("|");
-			}
-
-			_tprintf("|   PID    | %d                                                             |\n", windows[id].pid);
-			puts("+----------+------------------------------------------------------------------+");
-
-			puts(" T > 透明度を矢印キーで設定");
-			puts(" C > 透明度を数値で入力");
-			puts(" X > アプリケーション一覧へ戻る");
-			puts("-------------------------------------------------------------------------------");
-			printf("選択> ");
-			ch = _getche();
-
-			ch = toupper(ch);
-
-			if(ch == 'C') {
-				printf("\r透明度[%%]> ");
-				scanf_s("%d", &input);
-
-				if (100 < input || input <= 0) {
-					do {
-						fflush(stdin);
-						puts("正しい数値を入力してください。");
-						Sleep(1000);
-						printf("\r透明度[%%]> ");
-						scanf_s("%d", &input);
-					} while (100 < input || input <= 0);
+				if (input == -1) {
+					menu_flag = false;
+					break;
 				}
 
 				alpha = ((float)input / 100) * (float)255;
+				if (transparentWindow(id, alpha))
+					printf(" >>> ウィンドウの透明度を%d%%へ変更しました。\n", input);
+				else
+					hwnd_flag = true;
 
-				if (transparentWindow(id, alpha)){
-					printf(">> ウィンドウの透明度を%d%%へ変更しました。\n", input);
-					puts("'X'を押して戻る。");
-					while(1)
-						if((ch = toupper(getch())) == 'X' || ch == 0x1B) break;
-				}
-				else {
-					puts(">> 透明度の設定に失敗しました。");
-					puts("'X'を押して戻る。");
-					while(1)
-						if((ch = toupper(getch())) == 'X' || ch == 0x1B) break;
-				}
-			}
-			else if (ch == 'T') {
-				alpha = 255;
-				transparentWindow(id, alpha);
-				puts("\n'X'を押して戻る。");
-				while (1) {
-					ch = 0;
+				break;
+			case 'T':	// change transparent by arrow key
+				hwnd_flag = !changeTransparentUsingArrowKey(id);
+				menu_flag = hwnd_flag;
+				break;
 
-					printf("\r\t透明度:\t");
-					printf("|");
-					for (i = 0; i < alpha / 5; i++) {
-						if ((alpha / 5 - 1) == i) {
-							printf(">");
-						}
-						else {
-							printf("-");
-						}
-					}
-					for (; i < 51; i++) {
-						printf(" ");
-					}
+			default:
+				menu_flag = false;
+		}
 
-					printf("|");
+		if (choice == 0x1B ) break;
 
-					printf("  [");
-					printf("%003.f%%", ((float)alpha / (float)255 * 100) );
-					printf("] ");
+		if (hwnd_flag) {
+			puts("\n >>> HWNDが取得できませんでした。ホームへ戻ります。");
+			Sleep(2000);
+			break;
+		}
+		
+		if(menu_flag)
+			Sleep(2000);
 
-					ch = _getch();
-					if (ch == 0x48 || ch == 0x4d) {
-						if (alpha < 255) {
-							alpha += 5;
-							if (!transparentWindow(id, alpha)) break;
-						}
-					}
-					if (ch == 0x50 || ch == 0x4b) {
-						if (alpha > 5) {
-							alpha -= 5;
-							if (!transparentWindow(id, alpha)) break;
-						}
-					}
+	}
+}
 
-					if(toupper(ch) == 'X' || ch == 0x1B) break;
+/**
+ * @brief list applications and return the option.
+ * @return option (character code).
+ */
+char listApplications()
+{
+	//! charactor code temp
+	char ch;
 
-					Sleep(1);
-				}
-			}
+	do {
+
+		// clear the windows list.
+		windowCounter = 0;
+		for (int i = 0; i < 100; i++) {
+			windows[i].pid = NULL;
+			strcpy_s(windows[i].title, TEXT(""));
+		}
+
+		// clear the command line.
+		system("cls");
+
+		puts("+----------------------------------+                 +------------------------+");
+		puts("| 現在起動しているアプリケーション |                 | ウィンドウ透明化ツール |");
+		puts("+--------+-------------------------+-----------------+------------------------+");
+		puts("| No一覧 |                       アプリケーション名                           |");
+		puts("+--------+--------------------------------------------------------------------+");
+
+		// display the applications.
+		EnumWindows(EnumWindowsProc, (LPARAM)0);
+
+		printf(" R:リスト更新, S:設定, X:すべて元に戻す, ESC:終了> ");
+	} while ((ch = toupper(_getche())) == 'R');
+
+	return ch;
+}
+
+/**
+ * @brief get integer value.
+ * @return integer value or -1 (ESC CODE).
+ */
+int inputNumber() {
+
+	//! getch temp.
+	char ch;
+
+	//! string buffer max 255.
+	char buf[255];
+
+	//! buffer counter.
+	int i = 0;
+
+	//! escape flag.
+	bool esc = false;
+
+	while ((ch = _getch()) != 13) {
+		if (ch >= '0' && ch <= '9') {
+			putchar(ch);
+			buf[i++] = ch;
+		}
+
+		//! 0x1B == ESC
+		if (ch == 0x1B) {
+			esc = true;
+			break;
+		}
+
+		// backspace
+		if (ch == '\b' && i > 0) {
+			printf("\b \b");
+			i--;
 		}
 	}
 
-    return 0;
+	if (esc) return -1;
+
+	buf[i] = '\0';
+	puts("");
+
+	return atoi(buf);
+}
+
+/**
+ * @brief the main function.
+ * @return return the status code to system.
+ */
+int main()
+{
+	//! for windows id
+	int id;
+
+	//! for options
+	char ch;
+
+	system("title ウィンドウ透明化ツール");
+
+	while (1)
+	{
+		//! list application list and get options.
+		ch = listApplications();
+
+		switch (ch) {
+			case 'X':
+				// set all windows to 100%
+				setDefault();
+				break;
+
+			case 'S':
+				puts("");
+
+				while(1){
+					printf(" Noを入力 (ESCで戻る)> ");
+					id = inputNumber();
+					if (id <= windowCounter || id < 0 && id != -1) break;
+					puts(" >>> 正しいアプリケーション番号を入力してください。");
+				};
+
+				// back to the application list.
+				if (id == -1) break;
+
+				// go setting menu.
+				selected(--id);
+				break;
+		}
+
+		//! 0x1B == ESC
+		if (ch == 0x1B) break;
+	}
+
+	// return code
+	return 0;
 }
