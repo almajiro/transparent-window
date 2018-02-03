@@ -60,6 +60,7 @@ HWND gethWndfromWindows(int TargetID);
 void setDefault();
 void selected(int id);
 void dispSelectedHeader(int id);
+void displayMessage(LPCTSTR message, bool status);
 char getChoice();
 char listApplications();
 int inputNumber();
@@ -218,7 +219,8 @@ void setDefault()
 	for (int i = 0; i<windowCounter; i++) {
 		transparentWindow(i, 255);
 	}
-	puts("\n >>>すべてのアプリケーションの透明度を元に戻しました。");
+	puts("");
+	displayMessage("すべてのアプリケーションの透明度を元に戻しました。", false);
 
 	// wait for 2 seconds.
 	Sleep(2000);
@@ -232,6 +234,7 @@ void dispSelectedHeader(int id)
 {
 	system("cls");
 
+	setConsole(defaultColor);
 	puts("+----------------------------+                       +------------------------+");
 	puts("| 選択されたアプリケーション |                       | ウィンドウ透明化ツール |");
 	puts("+----------+-----------------+-----------------------+------------------------+");
@@ -241,6 +244,7 @@ void dispSelectedHeader(int id)
 	int i = 0;
 
 	while (*pt != 0) {
+		setConsole(highGreenColor);
 		if (_mbclen((BYTE*)pt) == 1) {
 			printf("%c", *pt);
 		}
@@ -248,6 +252,7 @@ void dispSelectedHeader(int id)
 			putchar(*pt);
 		}
 
+		setConsole(defaultColor);
 		if (i == 63) {
 			printf(" |\n");
 			printf("|          | ");
@@ -261,13 +266,15 @@ void dispSelectedHeader(int id)
 	}
 
 	if (i <= 63) {
+		setConsole(defaultColor);
 		for (int j = 0; j < 65 - i; j++) {
 			printf(" ");
 		}
 		puts("|");
 	}
 
-	_tprintf("|   PID    | %d                                                             |\n", windows[id].pid);
+	setConsole(defaultColor);
+	_tprintf("|   PID    | %4d                                                             |\n", windows[id].pid);
 
 	puts("+----------+------------------------------------------------------------------+");
 	puts("   T > 透明度を矢印キーで設定 (←↑↓→)");
@@ -306,7 +313,10 @@ BOOL changeTransparentUsingArrowKey(int id)
 
 	transparentWindow(id, alpha);
 	_putch('\n');
+
+	setConsole(dangerColor);
 	puts(" >>> ESCで戻る");
+	setConsole(promptColor);
 
 	while (1) {
 		ch = 0;
@@ -314,6 +324,14 @@ BOOL changeTransparentUsingArrowKey(int id)
 		printf("\r\t透明度:\t");
 		printf("|");
 		for (i = 0; i < alpha / 5; i++) {
+
+			if (i*5 <= 150)
+				setConsole(dangerColor);
+			else if (i * 5 >= 200)
+				setConsole(defaultColor);
+			else
+				setConsole(promptColor);
+
 			if ((alpha / 5 - 1) == i) {
 				printf(">");
 			}
@@ -325,10 +343,20 @@ BOOL changeTransparentUsingArrowKey(int id)
 			printf(" ");
 		}
 
-		printf("|");
 
-		printf("  [");
+		setConsole(promptColor);
+		printf("|  [");
+
+		if (alpha <= 150)
+			setConsole(dangerColor);
+		else if (alpha >= 200)
+			setConsole(defaultColor);
+		else
+			setConsole(promptColor);
+
 		printf("%003.f%%", ((float)alpha / (float)255 * 100));
+
+		setConsole(promptColor);
 		printf("] ");
 
 		ch = _getch();
@@ -377,17 +405,19 @@ void selected(int id)
 
 		dispSelectedHeader(id);
 
+		setConsole(promptColor);
 		printf(" 選択> ");
 		choice = getChoice();
 
 		switch (choice) {
 			case 'C':	// change transparent by value
 				while (1) {
+					setConsole(promptColor);
 					printf(" 透明度[%%] (ESCで戻る)> ");
 					input = inputNumber();
 
 					if (input == -1 || (input >= 0 && input <= 100 )) break;
-					puts(" >>> 正しい数値を入力してください。");
+					displayMessage("正しい数値を入力してください。", true);
 				}
 
 				if (input == -1) {
@@ -396,8 +426,11 @@ void selected(int id)
 				}
 
 				alpha = ((float)input / 100) * (float)255;
-				if (transparentWindow(id, alpha))
+				if (transparentWindow(id, alpha)) {
+					setConsole(defaultColor);
 					printf(" >>> ウィンドウの透明度を%d%%へ変更しました。\n", input);
+					displayMessage("一つ前のメニューへ戻ります。", false);
+				}
 				else
 					hwnd_flag = true;
 
@@ -405,6 +438,7 @@ void selected(int id)
 			case 'T':	// change transparent by arrow key
 				hwnd_flag = !changeTransparentUsingArrowKey(id);
 				menu_flag = hwnd_flag;
+				puts("\n");
 				break;
 
 			default:
@@ -414,7 +448,7 @@ void selected(int id)
 		if (choice == 0x1B ) break;
 
 		if (hwnd_flag) {
-			puts("\n >>> HWNDが取得できませんでした。ホームへ戻ります。");
+			displayMessage("HWNDが取得できませんでした。ホームへ戻ります。", true);
 			Sleep(2000);
 			break;
 		}
@@ -520,6 +554,13 @@ bool setConsole(WORD wAttributes)
 	return SetConsoleTextAttribute(hConsoleOutput, wAttributes);
 }
 
+void displayMessage(LPCTSTR message, bool status)
+{
+	setConsole(status ? dangerColor : defaultColor);
+	printf(" >>> ");
+	puts(message);
+}
+
 /**
  * @brief the main function.
  * @return return the status code to system.
@@ -549,10 +590,13 @@ int main()
 				puts("");
 
 				while(1){
-					printf(" Noを入力 (ESCで戻る)> ");
+					setConsole(dangerColor);
+					printf(" No");
+					setConsole(promptColor);
+					printf("を入力(ESCで戻る) > ");
 					id = inputNumber();
 					if (id <= windowCounter || id < 0 && id != -1) break;
-					puts(" >>> 正しいアプリケーション番号を入力してください。");
+					displayMessage("正しいアプリケーション番号を入力してください。", true);
 				};
 
 				// back to the application list.
