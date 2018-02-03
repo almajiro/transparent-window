@@ -14,6 +14,11 @@
  * TCHAR = WCHAR
  * LPCTSTR = const WCHAR*
  * LPTSTR = WCHAR*
+ * change the console color
+ * SetConsoleTextAttribute
+ *    - https://msdn.microsoft.com/ja-jp/library/cc429756.aspx
+ * Console color list
+ *    - http://www.geocities.jp/gameprogrammingunit/win/console/color.htm
  */
 
 // include headers
@@ -38,6 +43,14 @@ struct {
 //! running applications counter
 int windowCounter = 0;
 
+//! console standart output handler
+HANDLE hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+
+WORD dangerColor = FOREGROUND_RED | FOREGROUND_INTENSITY;
+WORD defaultColor = FOREGROUND_GREEN;
+WORD highGreenColor = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+WORD promptColor = FOREGROUND_GREEN | FOREGROUND_RED;
+
 // functions
 BOOL transparentWindow(int id, int alpha);
 BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass);
@@ -50,6 +63,7 @@ void dispSelectedHeader(int id);
 char getChoice();
 char listApplications();
 int inputNumber();
+bool setConsole(WORD wAttributes);
 
 /**
  * @brief transparent the application window.
@@ -127,9 +141,14 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 		TCHAR *pt = szTitle;
 		int i = 0;
 
-		_tprintf(TEXT("| No.%03d | "), windowCounter);
+		printf("|");
+		setConsole(dangerColor);
+		_tprintf(TEXT(" No.%03d "), windowCounter);
+		setConsole(defaultColor);
+		printf("| ");
 
 		while (*pt != 0) {
+			setConsole(highGreenColor);
 			if (_mbclen((BYTE*)pt) == 1) {
 				printf("%c", *pt);
 			}
@@ -138,6 +157,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 			}
 
 			if (i == 65) {
+				setConsole(defaultColor);
 				printf(" |\n");
 				printf("|        | ");
 				i = 0;
@@ -149,6 +169,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 			pt++;
 		}
 
+		setConsole(defaultColor);
 		if (i <= 65) {
 			for (int j = 0; j < 67 - i; j++) {
 				printf(" ");
@@ -414,6 +435,7 @@ char listApplications()
 	char ch;
 
 	do {
+		setConsole(defaultColor);
 
 		// clear the windows list.
 		windowCounter = 0;
@@ -434,7 +456,15 @@ char listApplications()
 		// display the applications.
 		EnumWindows(EnumWindowsProc, (LPARAM)0);
 
-		printf(" R:リスト更新, S:設定, X:すべて元に戻す, ESC:終了> ");
+		setConsole(promptColor);
+		printf(" R:リスト更新, S:設定, X:すべて元に戻す, ");
+
+		setConsole(dangerColor);
+		printf("ESC:終了");
+		setConsole(promptColor);
+
+		printf("> ");
+
 	} while ((ch = toupper(_getche())) == 'R');
 
 	return ch;
@@ -483,6 +513,11 @@ int inputNumber() {
 	puts("");
 
 	return atoi(buf);
+}
+
+bool setConsole(WORD wAttributes)
+{
+	return SetConsoleTextAttribute(hConsoleOutput, wAttributes);
 }
 
 /**
