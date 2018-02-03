@@ -5,6 +5,17 @@
  * @date 2018/01/18
  */
 
+/**
+ * @note
+ * TCHAR = char
+ * LPCTSTR = const char*
+ * LPTSTR = char*
+ * when UNICODE defined
+ * TCHAR = WCHAR
+ * LPCTSTR = const WCHAR*
+ * LPTSTR = WCHAR*
+ */
+
 // include headers
 #include "stdafx.h"
 #include <stdio.h>
@@ -15,7 +26,7 @@
 #include <string.h>
 #include <conio.h>
 
-// owner window?
+// is window owner?
 #define IsWindowOwner(h) (GetWindow(h,GW_OWNER) == NULL)
 
 //! running applications data
@@ -30,13 +41,13 @@ int windowCounter = 0;
 // functions
 BOOL transparentWindow(int id, int alpha);
 BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass);
+BOOL changeTransparentUsingArrowKey(int id);
 BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam);
 HWND gethWndfromWindows(int TargetID);
 void setDefault();
+void selected(int id);
 void dispSelectedHeader(int id);
 char getChoice();
-BOOL changeTransparentUsingArrowKey(int id);
-void selected(int id);
 char listApplications();
 int inputNumber();
 
@@ -69,6 +80,13 @@ BOOL transparentWindow(int id, int alpha)
 	return true;
 }
 
+/**
+ * @brief enum check
+ * @param hWnd HWND window handler
+ * @param LPCTSTR lpTitle title
+ * @param LPCTSTR lpClass class
+ * @return boolean window status
+ */
 BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass)
 {
 	if (IsWindowVisible(hWnd)) {
@@ -83,9 +101,15 @@ BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass)
 	return FALSE;
 }
 
+/**
+ * @brief callback function for EnumWindows
+ * @param hWnd HWND window handler
+ * @param lParal LPARAM application defined value
+ * @return boolean true
+ */
 BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 {
-	
+	//! title buffer
 	TCHAR szTitle[1024];
 	TCHAR szClass[1024];
 
@@ -223,8 +247,8 @@ void dispSelectedHeader(int id)
 	}
 
 	_tprintf("|   PID    | %d                                                             |\n", windows[id].pid);
-	puts("+----------+------------------------------------------------------------------+");
 
+	puts("+----------+------------------------------------------------------------------+");
 	puts("   T > 透明度を矢印キーで設定 (←↑↓→)");
 	puts("   C > 透明度を数値で入力 (0-100)");
 	puts(" ESC > 戻る");
