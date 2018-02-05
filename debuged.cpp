@@ -14,6 +14,7 @@
  * TCHAR = WCHAR
  * LPCTSTR = const WCHAR*
  * LPTSTR = WCHAR*
+ *
  * change the console color
  * SetConsoleTextAttribute
  *    - https://msdn.microsoft.com/ja-jp/library/cc429756.aspx
@@ -23,8 +24,9 @@
 
 /*
  * features
- * 1. transparent the application window
- * 2. trigger the keyboard, and when hit the shortcut the application window set to 0%
+ * 1.	transparent the application window.
+ * 2.	trigger the keyboard, and when hit the shortcut the application window set to 0%.
+ * ex.	keep the code clean 
  */
 
 // include headers
@@ -45,6 +47,8 @@ struct { TCHAR title[1024]; DWORD pid; } windows[100];
 //! running applications counter
 int windowCounter = 0;
 
+char ktoc[256][256];
+
 //! console standart output handler
 HANDLE hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -54,6 +58,7 @@ WORD highGreenColor = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 WORD promptColor = FOREGROUND_GREEN | FOREGROUND_RED;
 
 // function list
+BOOL __transparentWindow(HWND target, int alpha);
 BOOL transparentWindow(int id, int alpha);
 BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass);
 BOOL changeTransparentUsingArrowKey(int id);
@@ -61,7 +66,11 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam);
 HWND gethWndfromWindows(int TargetID);
 void setDefault();
 void selected(int id);
+void dispSelectedMenu();
 void dispSelectedHeader(int id);
+void triggerMenu(int id);
+void dispTriggerMenu();
+void dispTriggerHeader();
 void displayMessage(LPCTSTR message, bool status);
 char getChoice();
 char listApplications();
@@ -82,7 +91,6 @@ BOOL __transparentWindow(HWND target, int alpha) {
 
 	return true;
 }
-
 
 /**
  * @brief transparent the application window.
@@ -234,6 +242,9 @@ void setDefault()
 	Sleep(2000);
 }
 
+/**
+* @brief display the properties page menu
+*/
 void dispSelectedMenu() {
 	puts("+----------+------------------------------------------------------------------+");
 	puts("   T > 透明度を矢印キーで設定 (←↑↓→)");
@@ -242,6 +253,9 @@ void dispSelectedMenu() {
 	puts("-------------------------------------------------------------------------------");
 }
 
+/**
+* @brief display the trigger page menu
+*/
 void dispTriggerMenu()
 {
 	puts("+----------+-----------------------------------------+------------------------+");
@@ -303,6 +317,9 @@ void dispSelectedHeader(int id)
 	_tprintf("|   PID    | %4d                                                             |\n", windows[id].pid);
 }
 
+/**
+ * @brief display the trigger menu header
+ */
 void dispTriggerHeader()
 {
 	setConsole(defaultColor);
@@ -464,7 +481,7 @@ void selected(int id)
 					hwnd_flag = true;
 
 				break;
-			case 'T':	// change transparent by arrow key
+			case 'T':	// change transparent using arrow key
 				hwnd_flag = !changeTransparentUsingArrowKey(id);
 				menu_flag = hwnd_flag;
 				puts("\n");
@@ -588,10 +605,10 @@ bool setConsole(WORD wAttributes)
 }
 
 /**
-* @brief display message
-* @param status boolean 1=error 0=message
-* @return boolean
-*/
+ * @brief display message
+ * @param status boolean 1=error 0=message
+ * @return boolean
+ */
 void displayMessage(LPCTSTR message, bool status)
 {
 	setConsole(status ? dangerColor : defaultColor);
@@ -599,7 +616,10 @@ void displayMessage(LPCTSTR message, bool status)
 	puts(message);
 }
 
-
+/**
+ * @brief display trigger menu
+ * @param id integer application id.
+ */
 void triggerMenu(int id)
 {
 	TCHAR newTitle[1024];
@@ -631,16 +651,41 @@ void triggerMenu(int id)
 				if (strcmp(oldTitle, newTitle) || choice == 'R') {
 					choice = 0;
 					system("cls");
-					puts("trigger is running.");
+
+					setConsole(defaultColor);
+					puts("<<<トリガー起動中>>>\n");
+					setConsole(promptColor);
+
+					printf("アプリケーション名\n >");
 					puts(newTitle);
 					strcpy_s(oldTitle, newTitle);
+
+					setConsole(defaultColor);
+					printf("\n >ウィンドウ透明度の最高値: %d%%\n", _val_max);
+					printf(" >ウィンドウ透明度の最小値: %d%%\n\n", _val_min);
+
+					setConsole(promptColor);
+					puts("現在設定されているショートカットキー");
+					printf(" >%s + %s\n\n", ktoc[key[0]], ktoc[key[1]]);
+
+					displayMessage("ESCでトリガーを停止します。\n", 1);
+					
 				}
 
 				if ((GetKeyState(key[0]) & 0x8000) && (GetKeyState(key[1]) & 0x8000)) {
 					visible = !visible;
 
-					if (visible) __transparentWindow(target, val_max);
-					else __transparentWindow(target, val_min);
+					if (visible) {
+						setConsole(defaultColor);
+						printf("\r >>> 現在トリガーされているアプリケーションの透明度は最高値へ設定されています。");
+						__transparentWindow(target, val_max);
+					}
+					else {
+						setConsole(dangerColor);
+						printf("\r >>> 現在トリガーされているアプリケーションの透明度は最小値へ設定されています。");
+						__transparentWindow(target, val_min);
+					}
+					
 					Sleep(100);
 				}
 
@@ -655,20 +700,26 @@ void triggerMenu(int id)
 			puts("\n >>> ショートカットキーの設定");
 			puts(" >>> 準備ができた場合はキーを押してください(ESCで戻る)");
 
-			if (getChoice() != 0x1B) {
+			if (_getch() != 0x1B) {
 				int i, j;
 				bool flag;
 				for (j = 0; j < 2; j++) {
 					flag = false;
 
-					for (int i = 2; i >= 0; i--) {
-						printf("\rcount down = %d", i + 1);
+					for (int i = 3; i >= 0; i--) {
+						printf("\r >>> カウントダウン: %d", i);
 						Sleep(1000);
 					}
 					puts("");
 
 					for (i = 0; i < 256; i++) {
 						if (GetKeyState(i) & 0x8000) {
+							if (i >= 0x15 && 0x19 >= i) break;
+							if (i >= 0x1C && 0x1F >= i) break;
+							if (i >= 0x29 && 0x2B >= i) break;
+							if (i >= 0xE5 && 0xFE <= i) break;
+							if (i >= 0xE8 || i == 0x2F || i == 0xE5 || i == 0x6C) break;
+							printf(" >>> %s\n", ktoc[i]);
 							printf("%d\n", i);
 							flag = true;
 							break;
@@ -678,10 +729,13 @@ void triggerMenu(int id)
 					if (flag) {
 						key[j] = i;
 					}
-					else j--;
+					else {
+						displayMessage("キーが押されませんでした。", true);
+						break;
+					}
 				}
 
-				puts("exit configuration...");
+				displayMessage("一つ前のメニューへ戻ります。", false);
 				Sleep(2000);
 			}
 
@@ -705,6 +759,7 @@ void triggerMenu(int id)
 					while (1) {
 						printf("ウィンドウ透明度の最高値(ESCで戻る) > ");
 						num = inputNumber();
+						if (num == 0) puts("0");
 						if ((num <= 100 && num >= 0) || num == -1) break;
 						displayMessage("正しい数値を入力してください。", true);
 					};
@@ -752,6 +807,74 @@ int main()
 
 	system("title ウィンドウ透明化ツール");
 
+	setConsole(dangerColor);
+	puts("Initializing...");
+
+	// initializing ktoc array
+	strcpy_s(ktoc[VK_LBUTTON], "マウス左ボタン");
+	strcpy_s(ktoc[VK_RBUTTON], "マウス右ボタン");
+	strcpy_s(ktoc[VK_CANCEL], "マウス右ボタン");
+	strcpy_s(ktoc[VK_MBUTTON], "マウス中央ボタン");
+	strcpy_s(ktoc[VK_BACK], "Backspace");
+	strcpy_s(ktoc[VK_TAB], "Tab");
+	strcpy_s(ktoc[VK_CLEAR], "NumLock を外した状態のテンキー5");
+	strcpy_s(ktoc[VK_RETURN], "Enter");
+	strcpy_s(ktoc[VK_SHIFT], "Shift");
+	strcpy_s(ktoc[VK_CONTROL], "Ctrl");
+	strcpy_s(ktoc[VK_MENU], "Alt");
+	strcpy_s(ktoc[VK_PAUSE], "Pause");
+	strcpy_s(ktoc[VK_CAPITAL], "Caps Lock");
+	strcpy_s(ktoc[VK_ESCAPE], "Esc");
+	strcpy_s(ktoc[VK_SPACE], "Spacebar");
+	strcpy_s(ktoc[VK_PRIOR], "Page Up");
+	strcpy_s(ktoc[VK_NEXT], "Page Down");
+	strcpy_s(ktoc[VK_END], "End");
+	strcpy_s(ktoc[VK_HOME], "Home");
+	strcpy_s(ktoc[VK_ESCAPE], "Esc");
+	strcpy_s(ktoc[VK_LEFT], "左方向キー");
+	strcpy_s(ktoc[VK_UP], "上方向キー");
+	strcpy_s(ktoc[VK_RIGHT], "右方向キー");
+	strcpy_s(ktoc[VK_DOWN], "下方向キー");
+	strcpy_s(ktoc[VK_SNAPSHOT], "Insert");
+	strcpy_s(ktoc[VK_SNAPSHOT], "PrintScreen");
+	strcpy_s(ktoc[VK_DELETE], "Delete");
+	strcpy_s(ktoc[VK_LWIN], "左 Windows キー");
+	strcpy_s(ktoc[VK_RWIN], "右 Windows キー");
+	strcpy_s(ktoc[VK_APPS], "アプリケーションキー");
+	strcpy_s(ktoc[VK_MULTIPLY], "テンキー *");
+	strcpy_s(ktoc[VK_ADD], "テンキー +");
+	strcpy_s(ktoc[VK_SUBTRACT], "テンキー +");
+	strcpy_s(ktoc[VK_DECIMAL], "テンキー .");
+	strcpy_s(ktoc[VK_DIVIDE], "テンキー /");
+	strcpy_s(ktoc[VK_NUMLOCK], "Num Lock");
+	strcpy_s(ktoc[VK_SCROLL], "	Scroll");
+	strcpy_s(ktoc[VK_LSHIFT], "左Shiftキー");
+	strcpy_s(ktoc[VK_RSHIFT], "右Shiftキー");
+	strcpy_s(ktoc[VK_LCONTROL], "左Ctrlキー");
+	strcpy_s(ktoc[VK_RCONTROL], "右Ctrlキー");
+	strcpy_s(ktoc[VK_LMENU], "左Altキー");
+	strcpy_s(ktoc[VK_RMENU], "右Altキー");
+
+	// numpad and 0-9
+	for (int i = 0; i <10; i++) {
+		char temp[255], num_temp[2];
+		strcpy_s(temp, "NumPad");
+		_itoa_s(i, num_temp, sizeof(char) * 2, 10);
+		strcat_s(temp, num_temp);
+		strcpy_s(ktoc[0x60 + i], temp);
+		strcpy_s(ktoc[0x30 + i], num_temp);
+	}
+
+	// main keyboard a-z
+	for (int i = 0x41; i <= 0x5A; i++) {
+		int j;
+		j = toupper(i);
+
+		char temp[2] = { j, '\0' };
+		strcpy_s(ktoc[i], temp);
+	}
+	
+	// main loop
 	while (1)
 	{
 		//! list application list and get options.
