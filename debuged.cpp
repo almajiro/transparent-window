@@ -560,7 +560,7 @@ int inputNumber() {
 	char ch;
 
 	//! string buffer max 255.
-	char buf[255];
+	char buf[4];
 
 	//! buffer counter.
 	int i = 0;
@@ -569,21 +569,25 @@ int inputNumber() {
 	bool esc = false;
 
 	while ((ch = _getch()) != 13) {
-		if (ch >= '0' && ch <= '9') {
-			putchar(ch);
-			buf[i++] = ch;
+		if (i < 3) {
+			if (ch >= '0' && ch <= '9') {
+				putchar(ch);
+				buf[i++] = ch;
+			}
+
+			//! 0x1B == ESC
+			if (ch == 0x1B) {
+				esc = true;
+				break;
+			}
 		}
 
-		//! 0x1B == ESC
-		if (ch == 0x1B) {
-			esc = true;
-			break;
-		}
-
-		// backspace
-		if (ch == '\b' && i > 0) {
-			printf("\b \b");
-			i--;
+		if (i <= 3) {
+			// backspace
+			if (ch == '\b' && i > 0) {
+				printf("\b \b");
+				i--;
+			}
 		}
 	}
 
@@ -626,6 +630,7 @@ void triggerMenu(int id)
 	TCHAR oldTitle[1024];
 
 	bool visible = true;
+	bool hwnd_active = true;
 	char choice;
 
 	static int val_max = 255, val_min = 0;
@@ -647,7 +652,11 @@ void triggerMenu(int id)
 		if (choice == 'R') {
 			while (1) {
 
-				GetWindowText(target, newTitle, sizeof(newTitle));
+				if (!GetWindowText(target, newTitle, sizeof(newTitle))) {
+					hwnd_active = false;
+					break;
+				}
+
 				if (strcmp(oldTitle, newTitle) || choice == 'R') {
 					choice = 0;
 					system("cls");
@@ -789,6 +798,13 @@ void triggerMenu(int id)
 				fflush(stdin);
 				
 			} while (ch != 0x1B);
+		}
+		if (!hwnd_active) {
+			system("cls");
+			displayMessage("無効なウィンドウハンドラです。", true);
+			displayMessage("トップメニューへ戻ります。", true);
+			Sleep(2000);
+			break;
 		}
 	} while (choice != 0x1B);
 }
