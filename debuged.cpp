@@ -640,6 +640,8 @@ void triggerMenu(int id)
 	HWND target = gethWndfromWindows(id);
 
 	do{
+		system("title ウィンドウ透明化ツール");
+
 		setConsole(defaultColor);
 		system("cls");
 		dispTriggerHeader();
@@ -650,6 +652,7 @@ void triggerMenu(int id)
 		choice = getChoice();
 
 		if (choice == 'R') {
+			system("title ウィンドウ透明化ツール - トリガー起動中");
 			while (1) {
 
 				if (!GetWindowText(target, newTitle, sizeof(newTitle))) {
@@ -695,7 +698,7 @@ void triggerMenu(int id)
 						__transparentWindow(target, val_min);
 					}
 					
-					Sleep(100);
+					Sleep(500);
 				}
 
 				if (_kbhit()) {
