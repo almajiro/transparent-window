@@ -21,8 +21,13 @@
  *    - http://www.geocities.jp/gameprogrammingunit/win/console/color.htm
  */
 
+/*
+ * features
+ * 1. transparent the application window
+ * 2. trigger the keyboard, and when hit the shortcut the application window set to 0%
+ */
+
 // include headers
-#include "stdafx.h"
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
@@ -35,10 +40,7 @@
 #define IsWindowOwner(h) (GetWindow(h,GW_OWNER) == NULL)
 
 //! running applications data
-struct {
-	TCHAR title[1024];
-	DWORD pid;
-}windows[100];
+struct { TCHAR title[1024]; DWORD pid; } windows[100];
 
 //! running applications counter
 int windowCounter = 0;
@@ -51,7 +53,7 @@ WORD defaultColor = FOREGROUND_GREEN;
 WORD highGreenColor = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 WORD promptColor = FOREGROUND_GREEN | FOREGROUND_RED;
 
-// functions
+// function list
 BOOL transparentWindow(int id, int alpha);
 BOOL IsEnumCheck(HWND hWnd, LPCTSTR lpTitle, LPCTSTR lpClass);
 BOOL changeTransparentUsingArrowKey(int id);
@@ -66,6 +68,22 @@ char listApplications();
 int inputNumber();
 bool setConsole(WORD wAttributes);
 
+BOOL __transparentWindow(HWND target, int alpha) {
+	COLORREF r = RGB(255, 255, 255);
+
+	//! get window data with extended window style mode.
+	long i = GetWindowLong(target, GWL_EXSTYLE);
+
+	// changes an attribute of the specified window.
+	SetWindowLong(target, GWL_EXSTYLE, i | WS_EX_LAYERED);
+
+	// sets the opacity and transparency color key of a layered window.
+	SetLayeredWindowAttributes(target, r, alpha, LWA_ALPHA);
+
+	return true;
+}
+
+
 /**
  * @brief transparent the application window.
  * @param id integer application id.
@@ -74,23 +92,13 @@ bool setConsole(WORD wAttributes);
  */
 BOOL transparentWindow(int id, int alpha)
 {
-	//! rgb color
-	COLORREF r = RGB(255, 255, 255);
-
 	//! window handler
 	HWND hWnd = gethWndfromWindows(id);
 
 	// if failed to get window handler.
 	if (hWnd == NULL) return false;
 
-	//! get window data with extended window style mode.
-	long i = GetWindowLong(hWnd, GWL_EXSTYLE);
-
-	// changes an attribute of the specified window.
-	SetWindowLong(hWnd, GWL_EXSTYLE, i | WS_EX_LAYERED);
-
-	// sets the opacity and transparency color key of a layered window.
-	SetLayeredWindowAttributes(hWnd, r, alpha, LWA_ALPHA);
+	__transparentWindow(hWnd, alpha);
 
 	return true;
 }
@@ -226,6 +234,24 @@ void setDefault()
 	Sleep(2000);
 }
 
+void dispSelectedMenu() {
+	puts("+----------+------------------------------------------------------------------+");
+	puts("   T > 透明度を矢印キーで設定 (←↑↓→)");
+	puts("   C > 透明度を数値で入力 (0-100)");
+	puts(" ESC > 戻る");
+	puts("-------------------------------------------------------------------------------");
+}
+
+void dispTriggerMenu()
+{
+	puts("+----------+-----------------------------------------+------------------------+");
+	puts("   R > トリガーの起動");
+	puts("   S > ショートカットキーの設定");
+	puts("   P > 透明度の設定");
+	puts(" ESC > 戻る");
+	puts("-------------------------------------------------------------------------------");
+}
+
 /**
  * @brief display the properties page header
  * @param id integer application id.
@@ -275,12 +301,14 @@ void dispSelectedHeader(int id)
 
 	setConsole(defaultColor);
 	_tprintf("|   PID    | %4d                                                             |\n", windows[id].pid);
+}
 
-	puts("+----------+------------------------------------------------------------------+");
-	puts("   T > 透明度を矢印キーで設定 (←↑↓→)");
-	puts("   C > 透明度を数値で入力 (0-100)");
-	puts(" ESC > 戻る");
-	puts("-------------------------------------------------------------------------------");
+void dispTriggerHeader()
+{
+	setConsole(defaultColor);
+	puts("+----------+                                         +------------------------+");
+	puts("| トリガー |                                         | ウィンドウ透明化ツール |");
+	//puts("+----------+-----------------------------------------+------------------------+");
 }
 
 /**
@@ -404,6 +432,7 @@ void selected(int id)
 		menu_flag = true;
 
 		dispSelectedHeader(id);
+		dispSelectedMenu();
 
 		setConsole(promptColor);
 		printf(" 選択> ");
@@ -491,7 +520,7 @@ char listApplications()
 		EnumWindows(EnumWindowsProc, (LPARAM)0);
 
 		setConsole(promptColor);
-		printf(" R:リスト更新, S:設定, X:すべて元に戻す, ");
+		printf(" R:リスト更新, S:設定, X:すべて元に戻す, T:トリガー ");
 
 		setConsole(dangerColor);
 		printf("ESC:終了");
@@ -549,16 +578,164 @@ int inputNumber() {
 	return atoi(buf);
 }
 
+/**
+ * @brief set console color
+ * @return boolean
+ */
 bool setConsole(WORD wAttributes)
 {
 	return SetConsoleTextAttribute(hConsoleOutput, wAttributes);
 }
 
+/**
+* @brief display message
+* @param status boolean 1=error 0=message
+* @return boolean
+*/
 void displayMessage(LPCTSTR message, bool status)
 {
 	setConsole(status ? dangerColor : defaultColor);
 	printf(" >>> ");
 	puts(message);
+}
+
+
+void triggerMenu(int id)
+{
+	TCHAR newTitle[1024];
+	TCHAR oldTitle[1024];
+
+	bool visible = true;
+	char choice;
+
+	static int val_max = 255, val_min = 0;
+	static int _val_max = 100, _val_min = 0;
+	static char key[2] = {VK_CONTROL, VK_SPACE};
+
+	HWND target = gethWndfromWindows(id);
+
+	do{
+		setConsole(defaultColor);
+		system("cls");
+		dispTriggerHeader();
+		dispTriggerMenu();
+
+		setConsole(promptColor);
+		printf(" 選択> ");
+		choice = getChoice();
+
+		if (choice == 'R') {
+			while (1) {
+
+				GetWindowText(target, newTitle, sizeof(newTitle));
+				if (strcmp(oldTitle, newTitle) || choice == 'R') {
+					choice = 0;
+					system("cls");
+					puts("trigger is running.");
+					puts(newTitle);
+					strcpy_s(oldTitle, newTitle);
+				}
+
+				if ((GetKeyState(key[0]) & 0x8000) && (GetKeyState(key[1]) & 0x8000)) {
+					visible = !visible;
+
+					if (visible) __transparentWindow(target, val_max);
+					else __transparentWindow(target, val_min);
+					Sleep(100);
+				}
+
+				if (_kbhit()) {
+					if (_getch() == 0x1B) break;
+				}
+
+			}
+		}
+		if (choice == 'S') {
+			setConsole(defaultColor);
+			puts("\n >>> ショートカットキーの設定");
+			puts(" >>> 準備ができた場合はキーを押してください(ESCで戻る)");
+
+			if (getChoice() != 0x1B) {
+				int i, j;
+				bool flag;
+				for (j = 0; j < 2; j++) {
+					flag = false;
+
+					for (int i = 2; i >= 0; i--) {
+						printf("\rcount down = %d", i + 1);
+						Sleep(1000);
+					}
+					puts("");
+
+					for (i = 0; i < 256; i++) {
+						if (GetKeyState(i) & 0x8000) {
+							printf("%d\n", i);
+							flag = true;
+							break;
+						}
+					}
+
+					if (flag) {
+						key[j] = i;
+					}
+					else j--;
+				}
+
+				puts("exit configuration...");
+				Sleep(2000);
+			}
+
+		}
+		if (choice == 'P') {
+			char ch;
+
+			setConsole(defaultColor);
+			puts("\n >>> ショートカットキーの設定");
+			puts("	   E > ウィンドウ透明度の最高値(0-100)");
+			puts("	   D > ウィンドウ透明度の最小値(0-100)");
+			puts("	 ESC > 戻る\n");
+
+			do {
+				setConsole(promptColor);
+				printf("ショートカットキーの設定 > 選択> ");
+				ch = getChoice();
+
+				if (ch == 'E') {
+					int num;
+					while (1) {
+						printf("ウィンドウ透明度の最高値(ESCで戻る) > ");
+						num = inputNumber();
+						if ((num <= 100 && num >= 0) || num == -1) break;
+						displayMessage("正しい数値を入力してください。", true);
+					};
+
+					if (num !=-1){
+						_val_max = num;
+						val_max = ((float)num / 100) * (float)255;
+					}
+					else puts("");
+				}
+
+				if (ch == 'D') {
+					int num;
+					while (1) {
+						printf("ウィンドウ透明度の最小値(ESCで戻る) > ");
+						num = inputNumber();
+						if ((num <= 100 && num >= 0) || num == -1) break;
+						displayMessage("正しい数値を入力してください。", true);
+					};
+
+					if (num != -1) {
+						_val_min = num;
+						val_min = ((float)num / 100) * (float)255;
+					}
+					else puts("");
+				}
+				fflush(stdin);
+				
+			} while (ch != 0x1B);
+		}
+	} while (choice != 0x1B);
 }
 
 /**
@@ -586,6 +763,7 @@ int main()
 				setDefault();
 				break;
 
+			case 'T':
 			case 'S':
 				puts("");
 
@@ -595,15 +773,18 @@ int main()
 					setConsole(promptColor);
 					printf("を入力(ESCで戻る) > ");
 					id = inputNumber();
-					if (id <= windowCounter || id < 0 && id != -1) break;
+					if ( (id <= windowCounter && id > 0) || id == -1) break;
 					displayMessage("正しいアプリケーション番号を入力してください。", true);
 				};
 
 				// back to the application list.
 				if (id == -1) break;
 
-				// go setting menu.
-				selected(--id);
+				if (ch == 'T')
+					triggerMenu(--id);
+				else
+					selected(--id);
+
 				break;
 		}
 
