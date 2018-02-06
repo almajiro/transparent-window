@@ -1,35 +1,38 @@
 /**
- * @file transparent_testing.cpp
+ * @file main.cpp
  * @brief application window transparent tool.
  * @author almajiro
  * @date 2018/01/18
  */
 
-/**
- * @note
- * TCHAR = char
- * LPCTSTR = const char*
- * LPTSTR = char*
- * when UNICODE defined
- * TCHAR = WCHAR
- * LPCTSTR = const WCHAR*
- * LPTSTR = WCHAR*
- *
- * change the console color
- * SetConsoleTextAttribute
- *    - https://msdn.microsoft.com/ja-jp/library/cc429756.aspx
- * Console color list
- *    - http://www.geocities.jp/gameprogrammingunit/win/console/color.htm
- */
+ /**
+  * @note
+  * TCHAR = char
+  * LPCTSTR = const char*
+  * LPTSTR = char*
+  * when UNICODE defined
+  * TCHAR = WCHAR
+  * LPCTSTR = const WCHAR*
+  * LPTSTR = WCHAR*
+  *
+  * change the console color
+  * SetConsoleTextAttribute
+  *    - https://msdn.microsoft.com/ja-jp/library/cc429756.aspx
+  * Console color list
+  *    - http://www.geocities.jp/gameprogrammingunit/win/console/color.htm
+  * PDCurses
+  * rewind - clear the keyboard buffer
+  * fflush - clear the file buffer
+  */
 
-/*
- * features
- * 1.	transparent the application window.
- * 2.	trigger the keyboard, and when hit the shortcut the application window set to 0%.
- * ex.	keep the code clean 
- */
+  /**
+   * features
+   * 1.		transparent the application window.
+   * 2.		trigger the keyboard, and when hit the shortcut the application window set to 0%.
+   * ex.	keep the code clean
+   */
 
-// include headers
+ // include headers
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
@@ -37,6 +40,8 @@
 #include <psapi.h>
 #include <string.h>
 #include <conio.h>
+
+#define VERSION "1.0b"
 
 // is window owner?
 #define IsWindowOwner(h) (GetWindow(h,GW_OWNER) == NULL)
@@ -52,10 +57,14 @@ char ktoc[256][256];
 //! console standart output handler
 HANDLE hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
+//! console color
 WORD dangerColor = FOREGROUND_RED | FOREGROUND_INTENSITY;
 WORD defaultColor = FOREGROUND_GREEN;
 WORD highGreenColor = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 WORD promptColor = FOREGROUND_GREEN | FOREGROUND_RED;
+
+//! mutex handle
+HANDLE hMSP;
 
 // function list
 BOOL __transparentWindow(HWND target, int alpha);
@@ -166,12 +175,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam)
 
 		while (*pt != 0) {
 			setConsole(highGreenColor);
-			if (_mbclen((BYTE*)pt) == 1) {
-				printf("%c", *pt);
-			}
-			else {
-				putchar(*pt);
-			}
+			putchar(*pt);
 
 			if (i == 65) {
 				setConsole(defaultColor);
@@ -232,7 +236,7 @@ HWND gethWndfromWindows(int id)
  */
 void setDefault()
 {
-	for (int i = 0; i<windowCounter; i++) {
+	for (int i = 0; i < windowCounter; i++) {
 		transparentWindow(i, 255);
 	}
 	puts("");
@@ -260,7 +264,8 @@ void dispTriggerMenu()
 {
 	puts("+----------+-----------------------------------------+------------------------+");
 	puts("   R > トリガーの起動");
-	puts("   S > ショートカットキーの設定");
+	puts("   S > トリガーキーの設定");
+	puts("   A > アクションキーの設定");
 	puts("   P > 透明度の設定");
 	puts(" ESC > 戻る");
 	puts("-------------------------------------------------------------------------------");
@@ -285,12 +290,7 @@ void dispSelectedHeader(int id)
 
 	while (*pt != 0) {
 		setConsole(highGreenColor);
-		if (_mbclen((BYTE*)pt) == 1) {
-			printf("%c", *pt);
-		}
-		else { // which mean is 2 bytes character
-			putchar(*pt);
-		}
+		putchar(*pt);
 
 		setConsole(defaultColor);
 		if (i == 63) {
@@ -352,7 +352,7 @@ BOOL changeTransparentUsingArrowKey(int id)
 
 	//! counter
 	int i;
-	
+
 	//! window alpha
 	int alpha = 255;
 
@@ -370,7 +370,7 @@ BOOL changeTransparentUsingArrowKey(int id)
 		printf("|");
 		for (i = 0; i < alpha / 5; i++) {
 
-			if (i*5 <= 150)
+			if (i * 5 <= 150)
 				setConsole(dangerColor);
 			else if (i * 5 >= 200)
 				setConsole(defaultColor);
@@ -456,50 +456,50 @@ void selected(int id)
 		choice = getChoice();
 
 		switch (choice) {
-			case 'C':	// change transparent by value
-				while (1) {
-					setConsole(promptColor);
-					printf(" 透明度[%%] (ESCで戻る)> ");
-					input = inputNumber();
+		case 'C':	// change transparent by value
+			while (1) {
+				setConsole(promptColor);
+				printf(" 透明度[%%] (ESCで戻る)> ");
+				input = inputNumber();
 
-					if (input == -1 || (input >= 0 && input <= 100 )) break;
-					displayMessage("正しい数値を入力してください。", true);
-				}
+				if (input == -1 || (input >= 0 && input <= 100)) break;
+				displayMessage("正しい数値を入力してください。", true);
+			}
 
-				if (input == -1) {
-					menu_flag = false;
-					break;
-				}
-
-				alpha = ((float)input / 100) * (float)255;
-				if (transparentWindow(id, alpha)) {
-					setConsole(defaultColor);
-					printf(" >>> ウィンドウの透明度を%d%%へ変更しました。\n", input);
-					displayMessage("一つ前のメニューへ戻ります。", false);
-				}
-				else
-					hwnd_flag = true;
-
-				break;
-			case 'T':	// change transparent using arrow key
-				hwnd_flag = !changeTransparentUsingArrowKey(id);
-				menu_flag = hwnd_flag;
-				puts("\n");
-				break;
-
-			default:
+			if (input == -1) {
 				menu_flag = false;
+				break;
+			}
+
+			alpha = ((float)input / 100) * (float)255;
+			if (transparentWindow(id, alpha)) {
+				setConsole(defaultColor);
+				printf(" >>> ウィンドウの透明度を%d%%へ変更しました。\n", input);
+				displayMessage("一つ前のメニューへ戻ります。", false);
+			}
+			else
+				hwnd_flag = true;
+
+			break;
+		case 'T':	// change transparent using arrow key
+			hwnd_flag = !changeTransparentUsingArrowKey(id);
+			menu_flag = hwnd_flag;
+			puts("\n");
+			break;
+
+		default:
+			menu_flag = false;
 		}
 
-		if (choice == 0x1B ) break;
+		if (choice == 0x1B) break;
 
 		if (hwnd_flag) {
 			displayMessage("HWNDが取得できませんでした。ホームへ戻ります。", true);
 			Sleep(2000);
 			break;
 		}
-		
-		if(menu_flag)
+
+		if (menu_flag)
 			Sleep(2000);
 
 	}
@@ -631,15 +631,17 @@ void triggerMenu(int id)
 
 	bool visible = true;
 	bool hwnd_active = true;
+	bool kill = false;
 	char choice;
 
 	static int val_max = 255, val_min = 0;
 	static int _val_max = 100, _val_min = 0;
-	static char key[2] = {VK_CONTROL, VK_SPACE};
+	static char key[2] = { VK_CONTROL, VK_SPACE };
+	static char key_child[5] = { '1', '2', '3', '4', '5' };
 
 	HWND target = gethWndfromWindows(id);
 
-	do{
+	do {
 		system("title ウィンドウ透明化ツール");
 
 		setConsole(defaultColor);
@@ -651,6 +653,7 @@ void triggerMenu(int id)
 		printf(" 選択> ");
 		choice = getChoice();
 
+		// menu
 		if (choice == 'R') {
 			system("title ウィンドウ透明化ツール - トリガー起動中");
 			while (1) {
@@ -678,27 +681,66 @@ void triggerMenu(int id)
 
 					setConsole(promptColor);
 					puts("現在設定されているショートカットキー");
-					printf(" >%s + %s\n\n", ktoc[key[0]], ktoc[key[1]]);
+					printf(" >%s + %s\n", ktoc[key[0]], ktoc[key[1]]);
+					printf(" >> + %s ウィンドウの透明度を設定\n", ktoc[key_child[0]]);
+					printf(" >> + %s ウィンドウを最大化\n", ktoc[key_child[1]]);
+					printf(" >> + %s ウィンドウを最小化\n", ktoc[key_child[2]]);
+					printf(" >> + %s ウィンドウを元に戻す\n", ktoc[key_child[3]]);
+					printf(" >> + %s ターゲットのアプリケーションを終了\n\n", ktoc[key_child[4]]);
 
 					displayMessage("ESCでトリガーを停止します。\n", 1);
-					
+
 				}
 
 				if ((GetKeyState(key[0]) & 0x8000) && (GetKeyState(key[1]) & 0x8000)) {
-					visible = !visible;
+					bool actionFlag = false;
 
-					if (visible) {
-						setConsole(defaultColor);
-						printf("\r >>> 現在トリガーされているアプリケーションの透明度は最高値へ設定されています。");
-						__transparentWindow(target, val_max);
+					printf("\r                                                                              \r");
+
+					if (GetKeyState(key_child[1]) & 0x8000) {
+						ShowWindow(target, SW_MAXIMIZE);
+						printf("\r >>> ウィンドウを最大化しました。");
+						actionFlag = true;
 					}
-					else {
+
+					if (GetKeyState(key_child[2]) & 0x8000) {
+						ShowWindow(target, SW_MINIMIZE);
+						printf("\r >>> ウィンドウを最小化しました。");
+						actionFlag = true;
+					}
+
+					if (GetKeyState(key_child[3]) & 0x8000) {
+						ShowWindow(target, SW_RESTORE);
+						printf("\r >>> ウィンドウを元に戻しました。");
+						actionFlag = true;
+					}
+
+					if (GetKeyState(key_child[4]) & 0x8000) {
 						setConsole(dangerColor);
-						printf("\r >>> 現在トリガーされているアプリケーションの透明度は最小値へ設定されています。");
-						__transparentWindow(target, val_min);
+						puts("トリガーターゲットのアプリケーションを終了します。");
+						::PostMessage(target, WM_CLOSE, 0, 0);
+						Sleep(2000);
+						kill = true;
+						break;
 					}
-					
-					Sleep(500);
+
+					if (GetKeyState(key_child[0]) & 0x8000) {
+						actionFlag = true;
+						visible = !visible;
+
+						if (visible) {
+							setConsole(defaultColor);
+							printf("\r >>> 現在トリガーされているアプリケーションの透明度は最高値へ設定されています。");
+							__transparentWindow(target, val_max);
+						}
+						else {
+							setConsole(dangerColor);
+							printf("\r >>> 現在トリガーされているアプリケーションの透明度は最小値へ設定されています。");
+							__transparentWindow(target, val_min);
+						}
+					}
+
+					if (actionFlag) Sleep(500);
 				}
 
 				if (_kbhit()) {
@@ -709,14 +751,20 @@ void triggerMenu(int id)
 		}
 		if (choice == 'S') {
 			setConsole(defaultColor);
-			puts("\n >>> ショートカットキーの設定");
+			puts("\n >>> トリガーキーの設定");
 			puts(" >>> 準備ができた場合はキーを押してください(ESCで戻る)");
 
 			if (_getch() != 0x1B) {
-				int i, j;
+				int i, j, k;
 				bool flag;
+				bool error;
+
 				for (j = 0; j < 2; j++) {
+					setConsole(defaultColor);
+					printf(" >>> %dつ目のトリガーキー\n", j + 1);
+
 					flag = false;
+					error = false;
 
 					for (int i = 3; i >= 0; i--) {
 						printf("\r >>> カウントダウン: %d", i);
@@ -731,8 +779,24 @@ void triggerMenu(int id)
 							if (i >= 0x29 && 0x2B >= i) break;
 							if (i >= 0xE5 && 0xFE <= i) break;
 							if (i >= 0xE8 || i == 0x2F || i == 0xE5 || i == 0x6C) break;
+
+							setConsole(promptColor);
 							printf(" >>> %s\n", ktoc[i]);
-							printf("%d\n", i);
+							setConsole(defaultColor);
+
+							for (k = 0; k < 5; k++) {
+								if (key_child[k] == i) {
+									error = true;
+									break;
+								}
+							}
+
+							if (j == 1 && key[0] == i) {
+								error = true;
+							}
+
+							if (error) break;
+
 							flag = true;
 							break;
 						}
@@ -741,6 +805,11 @@ void triggerMenu(int id)
 					if (flag) {
 						key[j] = i;
 					}
+					else if (error) {
+						displayMessage("既に設定されているトリガーキー又はアクションキーは設定できません。", true);
+						j--;
+						Sleep(1000);
+					}
 					else {
 						displayMessage("キーが押されませんでした。", true);
 						break;
@@ -748,7 +817,7 @@ void triggerMenu(int id)
 				}
 
 				displayMessage("一つ前のメニューへ戻ります。", false);
-				Sleep(2000);
+				Sleep(1500);
 			}
 
 		}
@@ -756,14 +825,14 @@ void triggerMenu(int id)
 			char ch;
 
 			setConsole(defaultColor);
-			puts("\n >>> ショートカットキーの設定");
+			puts("\n >>> 透明度の設定");
 			puts("	   E > ウィンドウ透明度の最高値(0-100)");
 			puts("	   D > ウィンドウ透明度の最小値(0-100)");
 			puts("	 ESC > 戻る\n");
 
 			do {
 				setConsole(promptColor);
-				printf("ショートカットキーの設定 > 選択> ");
+				printf("透明度の設定 > 選択> ");
 				ch = getChoice();
 
 				if (ch == 'E') {
@@ -776,7 +845,7 @@ void triggerMenu(int id)
 						displayMessage("正しい数値を入力してください。", true);
 					};
 
-					if (num !=-1){
+					if (num != -1) {
 						_val_max = num;
 						val_max = ((float)num / 100) * (float)255;
 					}
@@ -799,9 +868,134 @@ void triggerMenu(int id)
 					else puts("");
 				}
 				fflush(stdin);
-				
+
 			} while (ch != 0x1B);
 		}
+		if (choice == 'A') {
+			char ch;
+			bool runFlag;
+			int target;
+
+			setConsole(defaultColor);
+			puts("\n >>> アクションキーの設定");
+			puts("	   T > ウィンドウの透明度を設定");
+			puts("	   M > ウィンドウを最大化");
+			puts("	   N > ウィンドウを最小化");
+			puts("	   R > ウィンドウを元に戻す");
+			puts("	   K > ターゲットのアプリケーションを終了");
+			puts("	 ESC > 戻る\n");
+
+			do {
+				setConsole(promptColor);
+				printf("アクションキーの設定 > 選択> ");
+
+				ch = getChoice();
+
+				switch (ch) {
+					case 'T':
+						displayMessage("ウィンドウの透明度を設定", false);
+						target = 0;
+						runFlag = true;
+						break;
+
+					case 'M':
+						displayMessage("ウィンドウを最大化", false);
+						target = 1;
+						runFlag = true;
+						break;
+
+					case 'N':
+						displayMessage("ウィンドウを最小化", false);
+						target = 2;
+						runFlag = true;
+						break;
+
+					case 'R':
+						displayMessage("ウィンドウを元に戻す", false);
+						target = 3;
+						runFlag = true;
+						break;
+
+					case 'K':
+						displayMessage("ターゲットのアプリケーションを終了", false);
+						target = 4;
+						runFlag = true;
+						break;
+
+					default:
+						runFlag = false;
+				}
+
+				if (runFlag) {
+					puts(" >>> 準備ができた場合はキーを押してください(ESCで戻る)");
+					if (_getch() != 0x1B) {
+						int i, j, k;
+						bool flag = false;
+						bool error = false;
+
+						for (int i = 3; i >= 0; i--) {
+							printf("\r >>> カウントダウン: %d", i);
+							Sleep(1000);
+						}
+						puts("");
+
+						for (i = 0; i < 256; i++) {
+							if (GetKeyState(i) & 0x8000) {
+								if (i >= 0x15 && 0x19 >= i) break;
+								if (i >= 0x1C && 0x1F >= i) break;
+								if (i >= 0x29 && 0x2B >= i) break;
+								if (i >= 0xE5 && 0xFE <= i) break;
+								if (i >= 0xE8 || i == 0x2F || i == 0xE5 || i == 0x6C) break;
+
+								setConsole(promptColor);
+								printf(" >>> %s\n", ktoc[i]);
+								setConsole(defaultColor);
+
+								for (k = 0; k < 5; k++) {
+									if (i == target) break;
+									if (key_child[k] == i) {
+										error = true;
+										break;
+									}
+								}
+
+								for (k = 0; k < 2; k++) {
+									if (key[k] == i) {
+										error = true;
+										break;
+									}
+								}
+
+								if (error) break;
+
+								flag = true;
+								break;
+							}
+						}
+
+						if (flag) {
+							key_child[target] = i;
+							displayMessage("設定されました。", false);
+							Sleep(2000);
+						}
+						else if (error) {
+							displayMessage("既に設定されているトリガーキー又はアクションキーは設定できません。", true);
+							Sleep(1000);
+						}
+						else {
+							displayMessage("キーが押されませんでした。", true);
+							Sleep(1000);
+						}
+						
+						//fflush(stdin); // not working.
+						if (_kbhit())
+							_getch();
+					}
+				}
+			} while (ch != 0x1B);
+		}
+
+		// exit
 		if (!hwnd_active) {
 			system("cls");
 			displayMessage("無効なウィンドウハンドラです。", true);
@@ -809,6 +1003,7 @@ void triggerMenu(int id)
 			Sleep(2000);
 			break;
 		}
+		if (kill) break;
 	} while (choice != 0x1B);
 }
 
@@ -824,7 +1019,11 @@ int main()
 	//! for options
 	char ch;
 
-	system("title ウィンドウ透明化ツール");
+	system("title ウィンドウ透明化ツール - Initializing");
+
+	setConsole(highGreenColor);
+	printf("ウィンドウ透明化ツール V");
+	puts(VERSION);
 
 	setConsole(dangerColor);
 	puts("Initializing...");
@@ -875,7 +1074,7 @@ int main()
 	strcpy_s(ktoc[VK_RMENU], "右Altキー");
 
 	// numpad and 0-9
-	for (int i = 0; i <10; i++) {
+	for (int i = 0; i < 10; i++) {
 		char temp[255], num_temp[2];
 		strcpy_s(temp, "NumPad");
 		_itoa_s(i, num_temp, sizeof(char) * 2, 10);
@@ -892,7 +1091,19 @@ int main()
 		char temp[2] = { j, '\0' };
 		strcpy_s(ktoc[i], temp);
 	}
-	
+	puts("ktoc array initialized.");
+
+	hMSP = CreateMutex(NULL, TRUE, "Application Window Transparent Tool");
+
+	if (GetLastError() == ERROR_ALREADY_EXISTS) {
+		MessageBox(NULL, "既にアプリケーションが起動しています。", "エラー", MB_OK);
+		ReleaseMutex(hMSP);
+		CloseHandle(hMSP);
+		return 1;
+	}
+
+	system("title ウィンドウ透明化ツール");
+
 	// main loop
 	while (1)
 	{
@@ -900,39 +1111,42 @@ int main()
 		ch = listApplications();
 
 		switch (ch) {
-			case 'X':
-				// set all windows to 100%
-				setDefault();
-				break;
+		case 'X':
+			// set all windows to 100%
+			setDefault();
+			break;
 
-			case 'T':
-			case 'S':
-				puts("");
+		case 'T':
+		case 'S':
+			puts("");
 
-				while(1){
-					setConsole(dangerColor);
-					printf(" No");
-					setConsole(promptColor);
-					printf("を入力(ESCで戻る) > ");
-					id = inputNumber();
-					if ( (id <= windowCounter && id > 0) || id == -1) break;
-					displayMessage("正しいアプリケーション番号を入力してください。", true);
-				};
+			while (1) {
+				setConsole(dangerColor);
+				printf(" No");
+				setConsole(promptColor);
+				printf("を入力(ESCで戻る) > ");
+				id = inputNumber();
+				if ((id <= windowCounter && id > 0) || id == -1) break;
+				displayMessage("正しいアプリケーション番号を入力してください。", true);
+			};
 
-				// back to the application list.
-				if (id == -1) break;
+			// back to the application list.
+			if (id == -1) break;
 
-				if (ch == 'T')
-					triggerMenu(--id);
-				else
-					selected(--id);
+			if (ch == 'T')
+				triggerMenu(--id);
+			else
+				selected(--id);
 
-				break;
+			break;
 		}
 
 		//! 0x1B == ESC
 		if (ch == 0x1B) break;
 	}
+
+	ReleaseMutex(hMSP);
+	CloseHandle(hMSP);
 
 	// return code
 	return 0;
